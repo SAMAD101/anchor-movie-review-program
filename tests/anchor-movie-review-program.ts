@@ -1,6 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { expect } from "chai";
+import { getAssociatedTokenAddress, getAccount } from "@solana/spl-token"
 import { AnchorMovieReviewProgram } from "../target/types/anchor_movie_review_program";
 
 describe("anchor-movie-review-program", () => {
@@ -21,12 +22,26 @@ describe("anchor-movie-review-program", () => {
     program.programId,
   );
 
+  const [mint] = anchor.web3.PublicKey.findProgramAddressSync(
+    [Buffer.from("mint")],
+    program.programId
+  )
+
   it("Movie review is added`", async () => {
+    const tokenAccount = await getAssociatedTokenAddress(
+      mint,
+      provider.wallet.publicKey,
+    );
+
     const tx = await program.methods
       .addMovieReview(movie.title, movie.description, movie.rating)
+      .accounts({
+        tokenAccount: tokenAccount,
+      })
       .rpc();
 
     const account = await program.account.movieAccountState.fetch(moviePda);
+
     expect(movie.title === account.title);
     expect(movie.rating === account.rating);
     expect(movie.description === account.description);
@@ -42,6 +57,7 @@ describe("anchor-movie-review-program", () => {
       .rpc();
 
     const account = await program.account.movieAccountState.fetch(moviePda);
+
     expect(movie.title === account.title);
     expect(newRating === account.rating);
     expect(newDescription === account.description);
@@ -50,5 +66,9 @@ describe("anchor-movie-review-program", () => {
 
   it("Deletes a movie review", async () => {
     const tx = await program.methods.deleteMovieReview(movie.title).rpc();
+  });
+
+  it("Initializes the reward token", async () => {
+    const tx = await program.methods.initializeTokenMint().rpc();
   });
 });
